@@ -59,24 +59,24 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:**  A search tool that opens up a selection of clothing listings available to pick from using a description, a optional size, and a optional max price.
+- **Inputs:** description (str), size (str), max_price (float)
+- **Returns:** A list of matching listing dicts, each with id, title, description, size, and price filters.
+- **When it has nothing:** An empty list when no listings match the description, size, and price filters. 
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** A suggestion tool for recommending one or two outfits that combine a selected listing with the user's wardrobe.
+- **Inputs:** new_item (dict listing), wardrobe (dict with an items list of wardrobe-item dicts)
+- **Returns:** A non-empty string containing one or two outfit suggestions, using specifc wardrobe pieces when they are available.
+- **When it has nothing:** A non-empty string with general styling advice when the wardrobe's items list is empty.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** A creation tool for providing a social-media-style caption for the selected item and the suggested outfit.
+- **Inputs:** outfit (str), new-item (dict listing)
+- **Returns:** A short, descriptive caption that mentions the item, the price, the platform, and the outfit's overall vibe.
+- **When it has nothing:** A descriptive message when the outfit is empty or contains only whitespace.
 
 ---
 
@@ -93,13 +93,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If search_listings returns an empty list, put a message in session["error"] describing what the user could change and stop before calling suggest_outfit. Otherwise, take the first result, store it in session["selected_item"], and go to suggest_outfit.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which --> The query is parsed with regular expressions. The parser extracts a description, an optional size, and an optional max_price float.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** <!-- which fields, in what order --> The session stores the original query, then parsed description/size/max_price values, search_results, the first result as selected_item, the wardrobe, the outfit_suggestion, and finally the fit_card. If no listings are found, the error is populated and the loop stops before suggest_outfit.
 
 ---
 
