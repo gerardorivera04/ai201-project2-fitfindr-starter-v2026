@@ -29,6 +29,8 @@ tool calls and returns a fit card — in at least 4 of 5 tries.
      "my search is a plain keyword match and some phrasings will miss" is a
      real answer. -->
 
+I picked 4 of 5 because the system is going to miss some valuable information with the clothing listings as it completes the process of returning a fit card. For instance, FitFindr possesses a search tool containing plain keyword match functionality, and some phrasings will be missed in the clothing listings that would affect the final details of the fit card.
+
 ---
 
 ## 2. An impossible query stops before the second tool
@@ -40,11 +42,13 @@ Given a query that matches no listings, the agent stops before calling
 <!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
      about this path? -->
 
+I picked 5 of 5 because the system is listing a user requirement that must be met before any outfits can be suggested. Thus, no clothing listings means no suggested outfits due to the FitFindr system not having anything to work with to make any progress. 
+
 ---
 
 ## 3. Something about state
 
-<!-- YOU WRITE THIS ONE.
+Given a suggested outfit, a comparison is conducted to ensure the searched items' information goes unchanged for the suggestions of one or two outfits to the user - in at least 3 of 5 tries.  
 
      How would you know that the item your search found is the same item the
      next tool received? Name something countable or observable.
@@ -58,13 +62,13 @@ Given a query that matches no listings, the agent stops before calling
 
 **Why this target:**
 
-
+I picked 3 of 5 because the suggested outfit functionality will miss out on key information of the clothing items that would some major confusion. For instance, the suggested outfit must have a clothing item in red for the suggested outfit, but is it a dark red or a lighter red color. 
 
 ---
 
 ## 4. Something about the fit card
 
-<!-- YOU WRITE THIS ONE.
+After the fit card is produced, all the details in the fit card are descriptive enough to where the card is shorter than a caption anyone would post - 5 of 5 tries. 
 
      The fit card calls a model, so the same input can produce different words
      each time. That's not a bug — it's the nature of the tool. So what would
@@ -79,13 +83,13 @@ Given a query that matches no listings, the agent stops before calling
 
 **Why this target:**
 
-
+I picked 5 of 5 because the fit card is intended to list all the clothing items and the information surrounding the ideal outfit, while the caption is meant to be very descriptive about what makes the outfit so special, such as details on its meaning and vibe.  
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
+Given a query that matches at least one listing, the search query respects a price ceiling to match the prices of the clothing listings - in at least 4 of 5 tries. 
 
      Pick something you actually care about getting right. Speed, the empty
      wardrobe path, what happens when the model can't be reached, whether the
@@ -96,7 +100,7 @@ Given a query that matches no listings, the agent stops before calling
 
 **Why this target:**
 
-
+I picked 4 of 5 because my search contains price-matching functionality, and some price ceilings would need to be adjusted to find the correct clothing listing in a specific price range.
 
 ---
 
