@@ -143,18 +143,18 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
         steps += 1
         trace.check_iterations(steps)
-        results = _search(parsed)
-        session["search_results"] = results
+        _search_result = _search(session["parsed"])
+        session["search_results"] = _search_result
         trace.step(
             "search_listings (via MCP)",
-            inputs=parsed,
-            returned=results,
-            note=f"{len(results)} match(es)",
+            inputs=session["parsed"],
+            returned=session["search_results"],
+            note=f"{len(session['search_results'])} match(es)",
         )
 
         # ── THE BRANCH ────────────────────────────────────────────────────────
-        if not results:
-            session["error"] = _nothing_found_message(parsed)
+        if not session["search_results"]:
+            session["error"] = _nothing_found_message(session["parsed"])
             trace.step(
                 "branch",
                 note="search returned []: stopping before suggest_outfit",
@@ -163,7 +163,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
         steps += 1
         trace.check_iterations(steps)
-        session["selected_item"] = results[0]
+        session["selected_item"] = session["search_results"][0]
         trace.step("select_item", returned=session["selected_item"])
 
         steps += 1
