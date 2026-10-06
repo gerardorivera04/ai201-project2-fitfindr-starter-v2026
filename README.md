@@ -41,7 +41,7 @@
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
 
-
+FitFindr lets a user describe a clothing item they want, including an optional size and maximum price. The system parses the request, searches the available listings, and selects the best matching item. It then suggests one or two outfits using the user's wardrobe, or gives general styling advice if the wardrobe is empty. Finally, it creates a short fit-card caption describing the selected item and outfit. However, if no listings match, it explains what the user could change and stops before the outfit steps.
 
 ---
 
@@ -190,15 +190,15 @@ Output: Found my holy grail medium wash vintage Levi's 501 jeans on depop for ju
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked Claude Code's AI chat assistant to help implement the query parser so that a user could enter a clothing description with an optional size and price limit.
+- *What came back:* It suggested using regular expressions to extract the size and the dollar amount, while leaving the remaining text as the description. 
+- *What I changed:* I implemented the parser in 'agent.py::parse_query', then adjusted the regular expressions so that sizes such as M, XL, and US 10 were recognized in the search tool without any major errors, such as accidentally matching letters inside words. In addition, I also verified that the returned 'max_price' was a float value.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked Claude Code's AI chat assistant how the planning loop should handle a search query that returns no clothing listings.  
+- *What came back:* The chat tool suggested to check whether the search result list was empty, putting an explanation in 'session["error"]', and returning before calling the 'suggest_outfit' function. 
+- *What I changed:* I would add that branch in 'agent.py::run_agent'. For instance, an empty result would have the code provide an explanation on what the user could change; Otherwise, the first listing is stored in 'session["selected_item"]' and continues to 'suggest_outfit'.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
