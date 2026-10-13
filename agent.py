@@ -134,70 +134,42 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # ⚠️ UNIT 4, MILESTONE 2 — everything in the try/except is unit 3 code; the
     # handler around it is what unit 4 adds, so that a bad key produces a
     # sentence rather than a stack trace.
-    try:
-        steps += 1
-        trace.check_iterations(steps)
-        parsed = parse_query(query)
-        session["parsed"] = parsed
-        trace.step("parse_query", inputs=query, returned=parsed)
+    steps += 1
+    trace.check_iterations(steps)
+    parsed = parse_query(query)
+    session["parsed"] = parsed
+    trace.step("parse_query", inputs=query, returned=str(parsed))
 
-        steps += 1
-        trace.check_iterations(steps)
-        _search_result = _search(session["parsed"])
-        session["search_results"] = _search_result
-        trace.step(
-            "search_listings (via MCP)",
-            inputs=session["parsed"],
-            returned=session["search_results"],
-            note=f"{len(session['search_results'])} match(es)",
-        )
+    steps += 1
+    trace.check_iterations(steps)
+    results = _search(session["parsed"])
+    session["search_results"] = results
+    trace.step("search_listings (via MCP)", inputs=str(parsed), returned=results, note=f"{len(results)} match(es)")
 
-        # ── THE BRANCH ────────────────────────────────────────────────────────
-        if not session["search_results"]:
-            session["error"] = _nothing_found_message(session["parsed"])
-            trace.step(
-                "branch",
-                note="search returned []: stopping before suggest_outfit",
-            )
-            return session
+    # ── THE BRANCH ────────────────────────────────────────────────────────
+    if not results:
+        session["error"] = _nothing_found_message(parsed)
+        trace.step("branch", note="search returned []: stopping before suggest_outfit",)
+        return session
 
-        steps += 1
-        trace.check_iterations(steps)
-        session["selected_item"] = session["search_results"][0]
-        trace.step("select_item", returned=session["selected_item"])
+    steps += 1
+    trace.check_iterations(steps)
+    session["selected_item"] = results[0]
+    trace.step("select_item", returned=session["selected_item"])
 
-        steps += 1
-        trace.check_iterations(steps)
-        session["outfit_suggestion"] = suggest_outfit(
-            session["selected_item"], session["wardrobe"]
-        )
-        trace.step(
-            "suggest_outfit",
-            inputs=session["selected_item"],
-            returned=session["outfit_suggestion"],
-            note=f"{len(session['wardrobe'].get('items') or [])} wardrobe item(s)",
-        )
+    steps += 1
+    trace.check_iterations(steps)
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+    trace.step("suggest_outfit", inputs=session["selected_item"], returned=session["outfit_suggestion"])
 
-        steps += 1
-        trace.check_iterations(steps)
-        session["fit_card"] = create_fit_card(
-            session["outfit_suggestion"], session["selected_item"]
-        )
-        trace.step(
-            "create_fit_card",
-            inputs=session["selected_item"],
-            returned=session["fit_card"],
-        )
-
-    except ModelUnavailable as exc:
-        session["error"] = (
-            f"The model couldn't be reached, so the outfit and caption steps "
-            f"didn't run. The search worked — "
-            f"{len(session['search_results'])} listing(s) were found. "
-            f"Check GEMINI_API_KEY in your .env, then run the same query "
-            f"again.\nWhat the service said: {exc}"
-        )
-        trace.step("model unavailable", note="stopping, search results kept")
+    steps += 1
+    trace.check_iterations(steps)
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+    trace.step("create_fit_card", inputs=session["selected_item"], returned=session["fit_card"])
 
     return session
 

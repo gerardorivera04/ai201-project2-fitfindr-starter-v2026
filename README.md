@@ -296,6 +296,25 @@ behaved differently afterwards. If the rewire didn't work, say exactly where it
 broke — the error text and the last thing that worked. That earns the point in
 full. -->
 
+`mcp_server.py` registers `search_listings` with typed `description`, `size`, and
+`max_price` inputs. `agent.py::_search` calls `mcp_client.call_tool` and falls
+back to the direct implementation if the MCP server is unavailable. The first
+check stopped at the environment because `mcp` was not installed:
+
+```
+Couldn't reach the server: No module named 'mcp'
+```
+
+After installing the already-declared `mcp>=1.0,<2.0` dependency, the same
+normal query worked:
+
+```
+$ python3 -c 'from mcp_client import call_tool; r=call_tool("search_listings", {"description":"denim jacket", "max_price":50}); print(type(r).__name__, len(r), r[0]["title"] if r else None)'
+list 7 Denim Jacket — Light Wash, Cropped
+```
+
+The MCP move is complete. The agent uses the single MCP result for the rest of
+the loop, so one search does not issue duplicate tool calls.
 
 
 ---
