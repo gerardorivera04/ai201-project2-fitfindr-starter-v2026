@@ -481,7 +481,8 @@ item, a non-empty outfit suggestion, and a fit card rather than stopping early.
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
 
-
+Despite meeting all five criteria after running the system again with the improvements, more testing could be used for designing my system around failure cases, such as fallback behavior. For instance, there would be some difficulty in forcing a unavailable-model case for
+verifying if the outfit suggestions still produce a non-empty fallback suggestion and the fit card still produces a descriptive caption due to the purpose of the improvement was to fix the model unavailable error for users to get the full experience out of FitFindr, such as finding clothing listings, receiving outfit suggestions, and a fit card. Furthermore, the model was successful in all tests, the results confirmed that the normal path works, and there wasn't proof to know what happens during a real outage of the system.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
