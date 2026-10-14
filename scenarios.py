@@ -35,7 +35,30 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
+    {
+        # A matching query whose selected item can be compared with the item
+        # received by suggest_outfit. Criterion 3.
+        "name": "selected item reaches outfit suggestion unchanged",
+        "query": "platform sneakers size US 8",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # run_eval.py repeats this same query, so the fit-card outputs all
+        # describe the same selected item. Criterion 4.
+        "name": "same item gets a fit card repeatedly",
+        "query": "silk slip dress in midi length under $40",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # A known listing priced at $24, with a ceiling that should include it.
+        # Criterion 5.
+        "name": "price ceiling is respected",
+        "query": "denim shorts under $25",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
     #
     # Set "criterion" to the number in criteria.md that the scenario tests.
     # "criterion": None means a diagnostic run — useful to have, but it isn't

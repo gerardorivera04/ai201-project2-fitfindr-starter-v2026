@@ -220,17 +220,97 @@ Output: Found my holy grail medium wash vintage Levi's 501 jeans on depop for ju
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | FAIL | FAIL | FAIL | PASS | PASS | MISSED (2/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. State reaches `suggest_outfit` unchanged | 3 of 5 | FAIL | PASS | PASS | FAIL | FAIL | MISSED (2/5) |
+| 4. Fit card is descriptive and caption-length | 5 of 5 | PASS | PASS | FAIL | PASS | FAIL | MISSED (3/5) |
+| 5. Price ceiling is respected | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:
 
+The following excerpts are copied from
+[`results/run_2026-10-13_2223_before.md`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/results/run_2026-10-13_2223_before.md),
+which was produced by [`run_eval.py::write_report`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/run_eval.py:121).
+The underlying traces and session fields were produced by
+[`agent.py::run_agent`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/agent.py:110);
+the search result was produced by
+[`tools.py::search_listings`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py:60),
+the outfit text by
+[`tools.py::suggest_outfit`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py:140),
+and the caption by
+[`tools.py::create_fit_card`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py:215).
+
+**Criterion 1 — Try 4, matching query completes**
+
+```
+- stopped early: no
+- selected_item: Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+- search_results: 10
+
+Fit card:
+
+Scored this 2003 tour bootleg style graphic tee on depop for just $24.00, and it’s officially my new uniform. Paired it with baggy dark wash denim and chunky boots for the ultimate moody grunge streetwear moment, but it looks just as good dressed down with khaki trousers. I'm obsessed with how easy it is to style.
 ```
 
+**Criterion 2 — Try 1, impossible query stops early**
+
+```
+- stopped early: yes — Nothing in the listings matched description 'designer ballgown', size XXS, under $5.
+Things to change: try broader words — 'jacket' finds more than 'cropped corduroy jacket'; drop the size, or try a neighbouring one; raise the price ceiling above $5.
+- selected_item: (none)
+- search_results: 0
+
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+      →    0 match(es)
+[3] branch
+      in:  [] (empty)
+      out: Nothing in the listings matched description 'designer ballgown', size XXS, under $5. Things to change: try broader words — 'jacket' finds more than 'cropped corduroy jacket'; drop the size, or try a neighbouring one; raise the price ceiling above $5.
+      →    search returned []: stopping before suggest_outfit
+```
+
+**Criterion 3 — Try 2, selected item reaches outfit suggestion unchanged**
+
+```
+- stopped early: no
+- selected_item: Platform Sneakers — White Chunky Sole ($48.0, poshmark)
+- search_results: 1
+
+[3] select_item
+      out: Platform Sneakers — White Chunky Sole ($48.0, poshmark)
+[4] suggest_outfit
+      in:  Platform Sneakers — White Chunky Sole ($48.0, poshmark)
+```
+
+**Criterion 4 — Try 1, same item gets a fit card**
+
+```
+- stopped early: no
+- selected_item: 90s Silk Slip Dress — Floral, Midi Length ($30.0, depop)
+- search_results: 5
+
+Fit card:
+
+Found this dreamy floral 90s silk slip dress on depop and I’m so obsessed. Scored it for just $30.00 and it’s giving the ultimate grungy-yet-femme balance layered under a beat-up denim jacket and combat boots.
+```
+
+**Criterion 5 — Try 1, price ceiling is respected**
+
+```
+[1] parse_query
+      in:  denim shorts under $25
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 2 items: High-Waisted Denim Shorts — Cutoff, Biker Shorts — Black, Shiny
+      →    2 match(es)
+[3] select_item
+      out: High-Waisted Denim Shorts — Cutoff ($24.0, poshmark)
 ```
 
 ---
