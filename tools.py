@@ -187,7 +187,22 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
             f"User wardrobe:\n{wardrobe_details}"
         )
 
-    return generate(prompt)
+    response = generate(prompt).strip()
+    if response:
+        return response
+
+    if not wardrobe_items:
+        return (
+            "Your wardrobe is empty, so I cannot name pieces you already own. "
+            "Try this item with neutral basics in a coordinating color, "
+            "comfortable shoes, and one simple accessory. Add wardrobe items "
+            "for more personalized outfit suggestions."
+        )
+
+    return (
+        "I couldn't generate an outfit suggestion from the available wardrobe "
+        "right now. Please try this query again."
+    )
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────

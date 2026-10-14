@@ -138,37 +138,75 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     trace.check_iterations(steps)
     parsed = parse_query(query)
     session["parsed"] = parsed
-    trace.step("parse_query", inputs=query, returned=str(parsed))
+    trace.step("parse_query", inputs=query, returned=parsed)
 
     steps += 1
     trace.check_iterations(steps)
     results = _search(session["parsed"])
     session["search_results"] = results
-    trace.step("search_listings (via MCP)", inputs=str(parsed), returned=results, note=f"{len(results)} match(es)")
+    trace.step(
+        "search_listings (via MCP)",
+        inputs=parsed,
+        returned=results,
+        note=f"{len(results)} match(es)",
+    )
 
     # ── THE BRANCH ────────────────────────────────────────────────────────
     if not results:
         session["error"] = _nothing_found_message(parsed)
-        trace.step("branch", note="search returned []: stopping before suggest_outfit",)
+        trace.step(
+            "branch",
+            inputs=results,
+            returned=session["error"],
+            note="search returned []: stopping before suggest_outfit",
+        )
         return session
 
     steps += 1
     trace.check_iterations(steps)
     session["selected_item"] = results[0]
-    trace.step("select_item", returned=session["selected_item"])
+    trace.step(
+        "select_item",
+        inputs=results,
+        returned=session["selected_item"],
+    )
 
     steps += 1
     trace.check_iterations(steps)
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"], session["wardrobe"]
-    )
+    try:
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"], session["wardrobe"]
+        )
+    except ModelUnavailable as exc:
+        session["error"] = _model_unavailable_message(
+            "the outfit suggestion", session, exc
+        )
+        trace.step(
+            "model unavailable",
+            inputs=session["selected_item"],
+            returned=session["error"],
+            note="stopping during suggest_outfit",
+        )
+        return session
     trace.step("suggest_outfit", inputs=session["selected_item"], returned=session["outfit_suggestion"])
 
     steps += 1
     trace.check_iterations(steps)
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
-    )
+    try:
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"], session["selected_item"]
+        )
+    except ModelUnavailable as exc:
+        session["error"] = _model_unavailable_message(
+            "the fit card", session, exc
+        )
+        trace.step(
+            "model unavailable",
+            inputs=session["selected_item"],
+            returned=session["error"],
+            note="stopping during create_fit_card",
+        )
+        return session
     trace.step("create_fit_card", inputs=session["selected_item"], returned=session["fit_card"])
 
     return session
@@ -197,6 +235,19 @@ def _nothing_found_message(parsed: dict) -> str:
     return (
         "Nothing in the listings matched " + ", ".join(tried) + ".\n"
         "Things to change: " + "; ".join(suggestions) + "."
+    )
+
+
+def _model_unavailable_message(
+    stage: str, session: dict, exc: ModelUnavailable
+) -> str:
+    """Explain which model step failed while preserving completed results."""
+    return (
+        f"The model couldn't be reached while generating {stage}. "
+        f"The search worked and found {len(session['search_results'])} listing(s). "
+        "Check GEMINI_API_KEY in your .env file, restore the original key if "
+        "you changed it for testing, and try this query again. "
+        f"What the service said: {exc}"
     )
 
 
