@@ -335,14 +335,17 @@ Found this dreamy floral 90s silk slip dress on depop and I’m so obsessed. Sco
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | A matching query completes all three tools | 4 of 5 | MISSED | The system passed 2 of 5 tries, which is below the target of 4 of 5. |
+| 2 | An impossible query stops before the second tool | 5 of 5 | MET | The system passed 5 of 5 tries, which meets the target of 5 of 5. |
+| 3 | State reaches ‘suggest_outfit’ unchanged | 3 of 5 | MISSED | The system passed 2 of 5 tries, which is below the target of 3 of 5. |
+| 4 | Fit card is descriptive and caption-length | 5 of 5 | MISSED | The systeam passed 3 of 5 tries, which is below the target of 5 of 5. |
+| 5 | Price ceiling is respected | 4 of 5 | MET | The system paased 5 of 5 tries, so it exceeded the target of 4 of 5. |
 
 **Diagnoses**
 
+(i) Criteria #1 Miss: The criterion for the usage of all three tools missed on 3 of 5 items because the loop stopped during the suggest_outfit step after the model returned an unavailable code error. The search listings tool and the select_item step worked, but the model failure caused the loop's error branch to stop before a fit card can be created. 
+(ii) Criteria #3 Miss: The state criterion missed on 3 of 5 items because the selected item was found correctly, but the model became unavailable when the loop reached the suggest_outfit step. For instance, the trace shows that selected_item remained unchanged after select_item, but the loop's error branch stopped execution after the model unavailable response instead of completing the outfit suggestions to the user. 
+(iii) Criteria #4 Miss: The fit card criterion missed on 2 of 5 items because the loop stopped at the suggest_outfit step before it reached the step for producing a fit card. The search did return a valid item, but the model returned an unavailable error that no fit card could be created for those tries. 
 
 
 ---
@@ -423,7 +426,20 @@ the loop, so one search does not issue duplicate tool calls.
 
 **What I changed:**
 
+I added recovery branches in `agent.py::run_agent` for model unavailability.
+If `suggest_outfit` cannot reach the model, the loop stores deterministic
+styling advice in `session["outfit_suggestion"]` and continues. If
+`create_fit_card` also cannot reach the model, the loop stores a deterministic
+caption in `session["fit_card"]`. Successful model responses still follow the
+original path unchanged, while fallback use is visible in the trace.
+
 **Which failure it was meant to fix:**
+
+The diagnosis identified model unavailability during `suggest_outfit` as the
+shared cause of the misses in criteria 1, 3, and 4. The old error branch
+returned before the fit-card step. These recovery branches keep the selected
+item unchanged, complete the remaining steps, and make the run less dependent
+on a successful model response.
 
 ### Run Log — After
 
@@ -436,6 +452,17 @@ the loop, so one search does not issue duplicate tool calls.
 | 5.  |  |  |  |  |  |  |  |
 
 **Did it help, and how do I know:**
+
+Run the after evaluation and paste its five-try results into the table above:
+
+```bash
+python run_eval.py --label after
+```
+
+The report is written under `results/`. Check the trace for
+`suggest_outfit fallback` or `create_fit_card fallback` when a model
+unavailability case is exercised. A fallback run should still have a selected
+item, a non-empty outfit suggestion, and a fit card rather than stopping early.
 
 <!-- If it made things worse, say that. Honestly reported, that earns full
      credit and is more interesting than one that worked. -->

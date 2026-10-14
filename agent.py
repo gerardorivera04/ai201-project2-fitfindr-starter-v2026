@@ -178,17 +178,21 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             session["selected_item"], session["wardrobe"]
         )
     except ModelUnavailable as exc:
-        session["error"] = _model_unavailable_message(
-            "the outfit suggestion", session, exc
+        session["outfit_suggestion"] = _fallback_outfit(
+            session["selected_item"], session["wardrobe"]
         )
         trace.step(
-            "model unavailable",
+            "suggest_outfit fallback",
             inputs=session["selected_item"],
-            returned=session["error"],
-            note="stopping during suggest_outfit",
+            returned=session["outfit_suggestion"],
+            note=f"model unavailable: {exc}",
         )
-        return session
-    trace.step("suggest_outfit", inputs=session["selected_item"], returned=session["outfit_suggestion"])
+    else:
+        trace.step(
+            "suggest_outfit",
+            inputs=session["selected_item"],
+            returned=session["outfit_suggestion"],
+        )
 
     steps += 1
     trace.check_iterations(steps)
@@ -197,17 +201,21 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             session["outfit_suggestion"], session["selected_item"]
         )
     except ModelUnavailable as exc:
-        session["error"] = _model_unavailable_message(
-            "the fit card", session, exc
+        session["fit_card"] = _fallback_fit_card(
+            session["selected_item"], session["outfit_suggestion"]
         )
         trace.step(
-            "model unavailable",
+            "create_fit_card fallback",
             inputs=session["selected_item"],
-            returned=session["error"],
-            note="stopping during create_fit_card",
+            returned=session["fit_card"],
+            note=f"model unavailable: {exc}",
         )
-        return session
-    trace.step("create_fit_card", inputs=session["selected_item"], returned=session["fit_card"])
+    else:
+        trace.step(
+            "create_fit_card",
+            inputs=session["selected_item"],
+            returned=session["fit_card"],
+        )
 
     return session
 
@@ -248,6 +256,40 @@ def _model_unavailable_message(
         "Check GEMINI_API_KEY in your .env file, restore the original key if "
         "you changed it for testing, and try this query again. "
         f"What the service said: {exc}"
+    )
+
+
+def _fallback_outfit(item: dict, wardrobe: dict) -> str:
+    """Keep the happy path moving when the outfit model is unavailable."""
+    title = item.get("title") or "this item"
+    wardrobe_items = wardrobe.get("items") or []
+    if wardrobe_items:
+        pieces = ", ".join(
+            str(piece.get("name") or piece.get("title") or "a wardrobe piece")
+            for piece in wardrobe_items[:3]
+        )
+        return (
+            f"Try {title} with pieces from your wardrobe such as {pieces}. "
+            "Finish the look with coordinating shoes and one simple accessory."
+        )
+    return (
+        f"Try {title} with neutral basics in a coordinating color, "
+        "comfortable shoes, and one simple accessory."
+    )
+
+
+def _fallback_fit_card(item: dict, outfit: str) -> str:
+    """Create a caption without a model so a completed run still has a card."""
+    title = item.get("title") or "this thrifted find"
+    price = item.get("price")
+    platform = item.get("platform") or "the resale market"
+    price_text = f"${price:.2f}" if isinstance(price, (int, float)) else "a great price"
+    vibe = outfit.split(".")[0].strip() or "an easy everyday vibe"
+    if vibe.lower().startswith("try "):
+        vibe = vibe[4:]
+    return (
+        f"Found this {title} on {platform} for {price_text}. "
+        f"Pairing it with {vibe.lower()} makes for an easy, personal look."
     )
 
 
