@@ -445,15 +445,21 @@ on a successful model response.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. State reaches ‘suggest_outfit’ unchanged | 3 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card is descriptive and caption-length | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Price ceiling is respected | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 **Did it help, and how do I know:**
 
-Run the after evaluation and paste its five-try results into the table above:
+Yes, this major change of adding a second branch is shown to be a massive help to meeting my criteria. All five criteria met or exceeded their targets: matching queries completed all three tools in 5 of 5 tries, impossible queries stopped early in 5 of 5 tries, the selected item reached
+`suggest_outfit` unchanged in 5 of 5 tries, every fit card was descriptive and caption-length in 5 of 5 tries, and every selected item stayed under the price ceiling in 5 of 5 tries. The before run missed criteria 1, 3, and 4, so the after run improved those measured results from 2/5, 2/5, and 3/5 to 5/5.
+
+The after report did not show a model-unavailability fallback because the model
+responded successfully during all matching-query runs. Therefore, this run
+confirms the normal path still works, but a separate outage test would be
+needed to measure the new fallback branches directly.
 
 ```bash
 python run_eval.py --label after
@@ -466,8 +472,6 @@ item, a non-empty outfit suggestion, and a fit card rather than stopping early.
 
 <!-- If it made things worse, say that. Honestly reported, that earns full
      credit and is more interesting than one that worked. -->
-
-
 
 ---
 
