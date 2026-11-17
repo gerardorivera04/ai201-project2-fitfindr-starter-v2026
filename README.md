@@ -525,10 +525,6 @@ verifying if the outfit suggestions still produce a non-empty fallback suggestio
      shows your criteria existed before your results did.
      ═════════════════════════════════════════════════════════════════════ -->
 
----
-
-📖 **How to run this project: [RUNNING.md](RUNNING.md)**
-
 ## Capstone 
 
 <!-- ═══════════════════════ UNIT 9 — CAPSTONE ═══════════════════════ -->
@@ -655,6 +651,16 @@ Output: A short caption naming the selected item, price, platform, and outfit vi
 $ python3 -c "from tools import check_deal; print(check_deal({'title': 'Denim Jacket', 'price': 42.0}, 50.0))"
 Output: {'status': 'within', 'price': 42.0, 'max_price': 50.0, 'message': 'This item costs $42.00, within your $50.00 maximum budget.'}
 ```
+
+---
+
+## Instrumentation
+
+---
+
+## What It Costs
+
+
 ---
 
 ## How I Used AI
@@ -677,6 +683,8 @@ Output: {'status': 'within', 'price': 42.0, 'max_price': 50.0, 'message': 'This 
 - *What I asked for:* 
 - *What came back:* 
 - *What I changed:* 
+
+📖 **How to run this project: [RUNNING.md](RUNNING.md)**
 
 <!-- ═══════════════════════ TESTING PHASE ═══════════════════════
 

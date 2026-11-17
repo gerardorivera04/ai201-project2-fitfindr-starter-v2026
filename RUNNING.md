@@ -1,50 +1,217 @@
 # Running FitFindr
 
-Everything about how the starter works and how to use it.
+**Selected path: Path B - local with logs.**
+
+FitFindr runs on the local machine behind a small HTTP server. A real run
+record is written to disk, rather than relying only on terminal output.
 
 ---
 
-## Before your first class
+## Environment requirements
 
-Setup happens **before class**. The [environment setup page](../pages/ide_setup)
-has the per-operating-system commands and the exact versions.
+- **Operating system:** macOS, Linux, or Windows
+- **Python:** 3.11, 3.12, or 3.13. Python 3.14 is not supported.
+- **Verified Python in this repository:** 3.13.15
+- **Memory/disk:** 4 GB RAM recommended; at least 2 GB free disk
+- **Required secret:** `GEMINI_API_KEY` in a local `.env` file
+- **Model:** `gemini-3.5-flash-lite`
+- **Model files:** none. The model is accessed through Gemini's API, so there
+  is no local model weight or model-file size to report.
+- **Application data:** `data/listings.json` and the wardrobe data under
+  `utils/data_loader.py`; the checked-in `data/` directory is 24 KB.
+- **Network:** required for model calls
 
-**Same API key you set up in unit 1.** Nothing new to sign up for. There is one
-new package — the MCP SDK, for unit 4 — and it installs with everything else.
+Dependencies are exact-pinned in `requirements.txt`. Do not use
+`pip install --upgrade`.
 
-From inside this repo after you've forked and cloned it:
+---
+
+## Clean-checkout setup
+
+Run these commands from the repository's parent directory.
 
 **macOS / Linux**
 
 ```bash
+git clone <repository-url> fitfindr
+cd fitfindr
+
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # then paste your key into .env
-python test.py
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+cp .env.example .env
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
+git clone <repository-url> fitfindr
+cd fitfindr
+
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env         # then paste your key into .env
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+Copy-Item .env.example .env
+```
+
+Open `.env` and replace `GEMINI_API_KEY=your_key_here` with your actual key.
+Never commit `.env`; it is excluded by `.gitignore`.
+
+Verify the setup:
+
+```bash
 python test.py
 ```
 
-**You're ready when `python test.py` passes.**
-
-If it doesn't and you've made one honest attempt at the error, post the
-**whole** output in the help channel.
-
-> Activate the virtual environment every time you open a new terminal. You
-> should see `(.venv)` at the start of your prompt.
+The environment is ready when `test.py` reports no `FAIL` lines.
 
 ---
 
-## Your first five minutes
+## Exact start command
+
+From the activated virtual environment at the root of the clean checkout:
+
+```bash
+python serve.py
+```
+
+The server is available at:
+
+```text
+http://localhost:5000
+```
+
+Verify it is running:
+
+```bash
+curl http://localhost:5000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+Run one real FitFindr request:
+
+```bash
+curl -X POST http://localhost:5000/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"vintage graphic tee under $30"}'
+```
+
+Use this command to stop the server: `Ctrl-C`.
+
+The server binds to `0.0.0.0` and reads `PORT` when set. When `PORT` is
+unset, it uses `5000`. For example:
+
+```bash
+PORT=5001 python serve.py
+curl http://localhost:5001/health
+```
+
+---
+
+## Structured run records
+
+Every HTTP agent run writes one JSON Lines entry to `logs/runs.jsonl`.
+Successful responses and failures must both be recorded. A missing output,
+invalid request, model failure, timeout, or rejected input is not silent: it
+is retained with `status` and `error` fields.
+
+Each entry has the following named fields:
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | UTC time at which the request was recorded |
+| `run_id` | Identifier unique to this run |
+| `input` | The submitted query |
+| `output` | Selected item, outfit, and fit card when successful |
+| `status` | `success` or `error` |
+| `duration_ms` | Wall-clock duration of the complete agent run |
+| `model` | Model name used for the run |
+| `model_calls` | Number of model calls made |
+| `prompt_tokens` | Prompt tokens reported by the provider |
+| `output_tokens` | Output tokens reported by the provider |
+| `cache_hits` | Responses served from the local cache |
+| `error` | `null` on success, otherwise a readable failure description |
+
+Example successful entry:
+
+```json
+{"timestamp":"2026-11-17T20:54:42Z","run_id":"6179a882","input":"vintage graphic tee under $30","output":"selected a matching listing and created an outfit and fit card","status":"success","duration_ms":1234,"model":"gemini-3.5-flash-lite","model_calls":2,"prompt_tokens":1683,"output_tokens":492,"cache_hits":0,"error":null}
+```
+
+Example rejected-input entry:
+
+```json
+{"timestamp":"2026-11-17T20:55:10Z","run_id":"4a8e1c23","input":"","output":null,"status":"error","duration_ms":1,"model":"gemini-3.5-flash-lite","model_calls":0,"prompt_tokens":0,"output_tokens":0,"cache_hits":0,"error":"Send JSON with a query field"}
+```
+
+The current commit should contain a real `logs/runs.jsonl`, not placeholder
+entries. To inspect it:
+
+```bash
+tail -n 20 logs/runs.jsonl
+```
+
+---
+
+## Cost measurement
+
+For one measured run, caching must be disabled:
+
+```bash
+AI201_CACHE=0 python serve.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:AI201_CACHE="0"
+python serve.py
+```
+
+Send the same normal request ten times. For every run, record:
+
+- wall-clock `duration_ms`
+- provider-reported `prompt_tokens`
+- provider-reported `output_tokens`
+- `model_calls`
+
+Take the arithmetic mean of all ten runs and paste the result in README.md
+under `What It Costs`. This is the measured cost of an agent run; the API
+pricing page is only an estimate.
+
+---
+
+## Troubleshooting
+
+If `test.py` says the key is missing, confirm `.env` exists at the repository
+root and contains `GEMINI_API_KEY`.
+
+If the port is already in use, choose another one:
+
+```bash
+PORT=5001 python serve.py
+```
+
+If `python serve.py` cannot import a package, activate `.venv` and run:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+---
+
+## Other commands
 
 Start with the data. Your tools will only be as good as your understanding of
 what they're reading, and ten minutes here saves an hour of confused debugging.
