@@ -2,7 +2,7 @@ import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from tools import search_listings, check_deal, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
 
 
@@ -25,6 +25,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "parsed": {},                # description / size / max_price you pulled out of it
         "search_results": [],        # everything search_listings returned
         "selected_item": None,       # the one you chose — goes into suggest_outfit
+        "deal_check": None,          # budget check performed before outfit suggestions
         "wardrobe": wardrobe,        # the user's wardrobe
         "outfit_suggestion": None,   # what suggest_outfit returned
         "fit_card": None,            # what create_fit_card returned
@@ -173,6 +174,36 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     steps += 1
     trace.check_iterations(steps)
+    session["deal_check"] = check_deal(
+        session["selected_item"], session["parsed"]["max_price"]
+    )
+    trace.step(
+        "check_deal",
+        inputs={
+            "item": session["selected_item"],
+            "max_price": session["parsed"]["max_price"],
+        },
+        returned=session["deal_check"],
+    )
+
+    if session["deal_check"]["status"] in {"over_budget", "unknown"}:
+        if session["deal_check"]["status"] == "over_budget":
+            session["error"] = session["deal_check"]["message"]
+        else:
+            session["error"] = (
+                "I cannot verify this listing's budget status because it has "
+                "no usable price."
+            )
+        trace.step(
+            "branch",
+            inputs=session["deal_check"],
+            returned=session["error"],
+            note="deal check failed: stopping before suggest_outfit",
+        )
+        return session
+
+    steps += 1
+    trace.check_iterations(steps)
     try:
         session["outfit_suggestion"] = suggest_outfit(
             session["selected_item"], session["wardrobe"]
@@ -303,6 +334,9 @@ def _show(session: dict) -> None:
 
     item = session["selected_item"] or {}
     print(f"  found:    {item.get('title')} — ${item.get('price')} on {item.get('platform')}")
+    deal_check = session["deal_check"] or {}
+    if deal_check.get("message"):
+        print(f"  deal:     {deal_check['message']}")
     print(f"  outfit:   {session['outfit_suggestion']}")
     print(f"  fit card: {session['fit_card']}")
 
