@@ -521,3 +521,71 @@ verifying if the outfit suggestions still produce a non-empty fallback suggestio
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+## Capstone 
+
+<!-- ═══════════════════════ UNIT 9 — CAPSTONE ═══════════════════════ -->
+
+## What This Does
+
+System: FitFindr clothing-search and outfit-recommendation agent
+
+
+<!-- ═══════════════════════ BUILDING PHASE ═══════════════════════
+
+     Don't fill these in during unit 3.
+     ═══════════════════════════════════════════════════════════════════ -->
+---
+
+## The Shape
+
+**Shape C — Extend one capability:** I am adding a deal-check capability that improves FitFindr's shopping experience before the agent recommends an item. After `search_listings` finds possible matches, the deal check will evaluate the listing's price in relation to the user's maximum budget and identify whether the clothing item is within budget, near the budget limit, or over budget. This gives the user useful price context before FitFindr continues to outfit suggestions and creates a fit card, while extending the existing search-and-recommendation workflow with one focused capability.
+
+---
+
+## What's Out of Scope
+
+I am not adding external price-history or market-value data, so the deal check will not claim that an item is cheaper than similar products elsewhere. I am also not building a complete budget optimizer that combines multiple clothing items or automatically creates a shopping cart; the feature will only evaluate the selected listing against the user's stated budget. Finally, I am not redesigning the interface or adding saved budget preferences, because the deal check will work within FitFindr's existing query, session, and recommendation flow.
+
+---
+
+## Planning Loop
+
+
+---
+
+## Sample Run
+
+
+---
+
+## How I Used AI
+
+<!-- ═══════════════════════ TESTING PHASE ═══════════════════════
+
+     Don't fill these in during the building phase.
+     ═══════════════════════════════════════════════════════════════════ -->
+
+---
+
+## Run Log - Before
+
+
+---
+
+## Verdicts
+
+
+
+---
+
+## Run Log - After
+
+---
+
+## The Improvement
+
+
+---
+
+## What's Still Broken
