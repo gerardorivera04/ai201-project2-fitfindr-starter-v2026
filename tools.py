@@ -135,6 +135,70 @@ def search_listings(
     return [listing for _, listing in scored[:config.SEARCH_RESULT_LIMIT]]
 
 
+# ── Tool 4: check_deal ───────────────────────────────────────────────────────
+
+def check_deal(new_item: dict, max_price: float | None) -> dict:
+    """
+    Compare a selected listing's price with the user's maximum budget.
+
+    Args:
+        new_item: a listing dict containing a numeric price.
+        max_price: the user's maximum price, or None when no ceiling was given.
+
+    Returns:
+        A dict with status, price, max_price, and a user-facing message.
+    """
+    price = new_item.get("price")
+
+    if not isinstance(price, (int, float)):
+        return {
+            "status": "unknown",
+            "price": price,
+            "max_price": max_price,
+            "message": "The listing did not provide a usable price.",
+        }
+
+    price = float(price)
+    if max_price is None:
+        return {
+            "status": "budget_not_specified",
+            "price": price,
+            "max_price": None,
+            "message": f"This item costs ${price:.2f}; no maximum budget was specified.",
+        }
+
+    max_price = float(max_price)
+    if price > max_price:
+        return {
+            "status": "over_budget",
+            "price": price,
+            "max_price": max_price,
+            "message": (
+                f"This item costs ${price:.2f}, which is over your "
+                f"${max_price:.2f} maximum budget."
+            ),
+        }
+    if price >= max_price * 0.90:
+        return {
+            "status": "near_limit",
+            "price": price,
+            "max_price": max_price,
+            "message": (
+                f"This item costs ${price:.2f}, close to your "
+                f"${max_price:.2f} maximum budget."
+            ),
+        }
+    return {
+        "status": "within",
+        "price": price,
+        "max_price": max_price,
+        "message": (
+            f"This item costs ${price:.2f}, within your "
+            f"${max_price:.2f} maximum budget."
+        ),
+    }
+
+
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
 
 def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
