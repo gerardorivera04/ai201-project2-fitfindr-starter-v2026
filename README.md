@@ -78,6 +78,13 @@ FitFindr lets a user describe a clothing item they want, including an optional s
 - **Returns:** A short, descriptive caption that mentions the item, the price, the platform, and the outfit's overall vibe.
 - **When it has nothing:** A descriptive message when the outfit is empty or contains only whitespace.
 
+### `check_deal`
+
+- **What it does:** Compares the selected listing's price with the user's parsed maximum budget before an outfit is recommended.
+- **Inputs:** new_item (dict listing), max_price (float or None)
+- **Returns:** A dict containing `status`, `price`, `max_price`, and a user-facing `message`.
+- **When it has nothing:** With no maximum budget, it returns `status="budget_not_specified"` and gives the item price; with no usable price, it returns `status="unknown"`.
+
 ---
 
 ## Planning Loop
@@ -93,13 +100,13 @@ FitFindr lets a user describe a clothing item they want, including an optional s
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:** If search_listings returns an empty list, put a message in session["error"] describing what the user could change and stop before calling suggest_outfit. Otherwise, take the first result, store it in session["selected_item"], and go to suggest_outfit.
+**Branch rule:** If search_listings returns an empty list, put a message in session["error"] describing what the user could change and stop before calling check_deal or suggest_outfit. Otherwise, take the first result, store it in session["selected_item"], and run check_deal. If the deal status is over_budget or unknown, stop before calling suggest_outfit. Otherwise, continue to suggest_outfit.
 
 **Where it lives:** `agent.py::run_agent`
 
 **How the query is parsed:** <!-- regex, string splitting, or asking the model — say which --> The query is parsed with regular expressions. The parser extracts a description, an optional size, and an optional max_price float.
 
-**What moves through the session:** <!-- which fields, in what order --> The session stores the original query, then parsed description/size/max_price values, search_results, the first result as selected_item, the wardrobe, the outfit_suggestion, and finally the fit_card. If no listings are found, the error is populated and the loop stops before suggest_outfit.
+**What moves through the session:** <!-- which fields, in what order --> The session stores the original query, then parsed description/size/max_price values, search_results, the first result as selected_item, and the deal_check result. The loop stops with an error for an over-budget or unusable-price deal check. Otherwise it passes the item and wardrobe to suggest_outfit and stores outfit_suggestion, then create_fit_card stores the final fit_card. If no listings are found, the error is populated and the loop stops before check_deal or suggest_outfit.
 
 ---
 
@@ -551,15 +558,125 @@ I am not adding external price-history or market-value data, so the deal check w
 
 ## Planning Loop
 
+**Branch rule:** If `search_listings` returns an empty list, store an explanatory
+message in `session["error"]` and stop before `check_deal` or
+`suggest_outfit`. Otherwise, select the first listing and run `check_deal`.
+If the status is `over_budget` or `unknown`, store the deal error in
+`session["error"]` and stop before `suggest_outfit`. Otherwise, continue to
+`suggest_outfit` and then `create_fit_card`.
+
+**Where it lives:** `agent.py::run_agent`
+
+**How the query is parsed:** The query is parsed with regular expressions.
+`parse_query()` extracts the clothing description, optional size, and optional
+maximum price as a float.
+
+**What moves through the session:** The session stores the original query;
+parsed description, size, and maximum price; search results; selected listing;
+deal-check status and message; outfit suggestion; and fit card. For empty
+search results or a failed deal check, the session's `error` field is populated
+and the loop stops early.
 
 ---
 
 ## Sample Run
 
+<!-- Two things go here.
+
+     1. One FULL query and its output, pasted as text.
+     2. Your four per-tool terminal tests — the command and what it printed. -->
+
+**One full query**
+```
+python3 app.py ask 'graphic tee under $30' --trace
+
+[1] parse_query
+      in:  graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 6 items: Graphic Tee — 2003 Tour Bootleg Style, Y2K Baby Tee — Butterfly Print, Vintage Band Tee — Faded Grey … +3 more
+      →    6 match(es)
+[3] select_item
+      in:  6 items: Graphic Tee — 2003 Tour Bootleg Style, Y2K Baby Tee — Butterfly Print, Vintage Band Tee — Faded Grey … +3 more
+      out: Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+[4] check_deal
+      in:  dict with keys: item, max_price
+      out: dict with keys: status, price, max_price, message
+[5] suggest_outfit
+      in:  Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+      out: Here are two complete outfits featuring the new Graphic Tee, using only items from your wardrobe:  ### Outfit …
+[6] create_fit_card
+      in:  Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+      out: Found this sick 2003 tour bootleg style graphic tee on depop for just $24.00 and I am so obsessed with how it …
+
+  Found:    Graphic Tee — 2003 Tour Bootleg Style — $24.0 on depop
+  Deal:     This item costs $24.00, within your $30.00 maximum budget.
+
+  Outfit:   Here are two complete outfits featuring the new Graphic Tee, using only items from your wardrobe:
+
+### Outfit 1: The Classic Streetwear Look
+* **Top:** Graphic Tee — 2003 Tour Bootleg Style
+* **Bottoms:** Baggy straight-leg jeans, dark wash (`w_001`)
+* **Outerwear:** Vintage black denim jacket (`w_006`)
+* **Shoes:** Chunky white sneakers (`w_007`)
+* **Accessories:** Black crossbody bag (`w_010`)
+
+**Why it works:** 
+This outfit leans heavily into the streetwear vibe of the bootleg tee. Pairing the slightly boxy graphic tee with the baggy dark wash jeans creates a relaxed, effortless silhouette. Layering the slightly cropped vintage black denim jacket on top adds texture and dimension while keeping the color palette grounded, and the chunky white sneakers and crossbody bag tie the modern streetwear aesthetic together.
 
 ---
 
+### Outfit 2: Grunge-Edge Contrast
+* **Top:** Graphic Tee — 2003 Tour Bootleg Style
+* **Bottoms:** Wide-leg khaki trousers (`w_002`)
+* **Shoes:** Black combat boots (`w_008`)
+* **Accessories:** Brown leather belt (`w_009`), Black crossbody bag (`w_010`)
+
+**Why it works:**
+This combination plays on high-low contrast by pairing the grungy, faded band tee with the clean, minimalist lines of the wide-leg khaki trousers. Tucking the tee in and using the brown leather belt adds structureto the outfit. Finishing the look with the black combat boots honors the grunge roots of the graphic tee, creating a balanced mix of tailored and edgy elements.
+
+  Fit card: Found this sick 2003 tour bootleg style graphic tee on depop for just $24.00 and I am so obsessed with how it looks styled with wide-leg trousers and combat boots for that grungy, effortless edge. Total win for the wardrobe rotation today!
+
+0 model calls this session, 2 served from cache
+```
+
+**The four tools, tested one at a time**
+```
+$ python3 -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+Output: 6 matching listings were returned, all priced at or below $30.00.
+
+$ python3 -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Output: A non-empty outfit suggestion recommending wardrobe pieces and explaining why the combination works.
+
+$ python3 -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Output: A short caption naming the selected item, price, platform, and outfit vibe.
+
+$ python3 -c "from tools import check_deal; print(check_deal({'title': 'Denim Jacket', 'price': 42.0}, 50.0))"
+Output: {'status': 'within', 'price': 42.0, 'max_price': 50.0, 'message': 'This item costs $42.00, within your $50.00 maximum budget.'}
+```
+---
+
 ## How I Used AI
+
+<!-- Two specific moments. What you asked, what came back, what you changed.
+
+     "I used Claude to help me code" is not enough.
+
+     "I gave Claude my search_listings spec. It returned None on no match
+     instead of an empty list, so I changed it" is the level we want. -->
+
+**Moment 1**
+
+- *What I asked for:* 
+- *What came back:* 
+- *What I changed:* 
+
+**Moment 2**
+
+- *What I asked for:* 
+- *What came back:* 
+- *What I changed:* 
 
 <!-- ═══════════════════════ TESTING PHASE ═══════════════════════
 
@@ -573,13 +690,17 @@ I am not adding external price-history or market-value data, so the deal check w
 
 ---
 
-## Verdicts
+## Verdicts and Diagnoses
 
 
 
 ---
 
 ## Run Log - After
+
+---
+
+## Loop Trace
 
 ---
 
