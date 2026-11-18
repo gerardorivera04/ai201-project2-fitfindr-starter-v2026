@@ -656,9 +656,53 @@ Output: {'status': 'within', 'price': 42.0, 'max_price': 50.0, 'message': 'This 
 
 ## Instrumentation
 
+FitFindr writes every `/ask` result to `logs/runs.jsonl` as one JSON object per
+line. The record includes UTC timestamp, run ID, input, output summary, status,
+wall-clock duration, model, model-call count, provider-reported token counts,
+and an error field. Invalid requests and agent failures are logged too.
+
+The following ten entries are real cache-disabled runs of
+`POST /ask {"query":"vintage graphic tee under $30"}` from
+`AI201_CACHE=0 PORT=5010 python3 serve.py`.
+
+```text
+{"timestamp":"2026-11-18T00:52:22Z","run_id":"136cc5e7-cdd0-4ee5-aa52-7b74571643e2","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":3644,"model_calls":2,"prompt_tokens":1620,"output_tokens":434,"error":null}
+{"timestamp":"2026-11-18T00:52:25Z","run_id":"58cc1713-13d0-431b-855c-c2a2fb6c31bb","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2552,"model_calls":2,"prompt_tokens":1601,"output_tokens":401,"error":null}
+{"timestamp":"2026-11-18T00:52:27Z","run_id":"a3a659b4-43ab-4f91-837e-43650ddf6a51","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2477,"model_calls":2,"prompt_tokens":1606,"output_tokens":406,"error":null}
+{"timestamp":"2026-11-18T00:52:30Z","run_id":"6a8f91e0-66f6-41a7-8051-219a0021c83c","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2524,"model_calls":2,"prompt_tokens":1639,"output_tokens":442,"error":null}
+{"timestamp":"2026-11-18T00:52:33Z","run_id":"7dbb1013-3709-46aa-b893-932b34f1d070","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2641,"model_calls":2,"prompt_tokens":1632,"output_tokens":448,"error":null}
+{"timestamp":"2026-11-18T00:52:35Z","run_id":"2883ffc3-64d9-49f2-a519-178cb7d0efef","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2548,"model_calls":2,"prompt_tokens":1621,"output_tokens":426,"error":null}
+{"timestamp":"2026-11-18T00:52:38Z","run_id":"8494a389-1593-4257-b79e-b51d44d625ca","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2650,"model_calls":2,"prompt_tokens":1634,"output_tokens":442,"error":null}
+{"timestamp":"2026-11-18T00:53:21Z","run_id":"74778b08-6328-4f0a-be12-75026d18e651","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":42693,"model_calls":2,"prompt_tokens":1622,"output_tokens":420,"error":null}
+{"timestamp":"2026-11-18T00:53:24Z","run_id":"d643029c-5295-458c-a685-97cf8670ff50","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":3353,"model_calls":2,"prompt_tokens":1592,"output_tokens":388,"error":null}
+{"timestamp":"2026-11-18T00:53:27Z","run_id":"9190fd9d-2d1d-48d1-a3c0-8eae5b4c0828","input":"vintage graphic tee under $30","output":"Graphic Tee — 2003 Tour Bootleg Style","status":"success","duration_ms":2590,"model_calls":2,"prompt_tokens":1668,"output_tokens":476,"error":null}
+```
+
+**Failed/Rejected Run**
+
+```text
+{"timestamp":"2026-11-18T00:52:19Z","run_id":"0961b12a-957d-4888-b4a2-17d8a1a15e33","input":"","output":null,"status":"error","duration_ms":0,"model_calls":0,"prompt_tokens":0,"output_tokens":0,"error":"Send JSON with a 'query' field, e.g. {\"query\":\"vintage graphic tee under $30\"}"}
+```
+
+The complete records, including outfit and fit-card output, are committed in
+[`logs/runs.jsonl`](logs/runs.jsonl).
+
 ---
 
 ## What It Costs
+
+**Measured result:** one normal FitFindr agent run averaged **2.0 model calls**,
+**1,623.5 prompt tokens**, **428.3 output tokens**, and
+**6,767.2 ms of wall-clock time** across ten cache-disabled runs.
+
+**Method:** I started the server with
+`AI201_CACHE=0 PORT=5010 python3 serve.py`, sent the same
+`vintage graphic tee under $30` request ten times, and recorded provider usage
+and wall-clock duration in `logs/runs.jsonl`. Each run logged the difference
+between cumulative model-call and token counters before and after
+`run_agent()`. I added all ten values and divided by ten. The 42,693 ms entry
+included a service/rate-limit wait and is retained rather than removed as an
+outlier.
 
 
 ---

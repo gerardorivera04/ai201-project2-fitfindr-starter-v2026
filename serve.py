@@ -36,6 +36,10 @@ what belongs in one — and the timing field is the one everybody skips.
 import os
 import sys
 import threading
+import json
+import time
+import uuid
+from datetime import datetime, timezone
 
 # config first, and before anything that talks to the model: it loads your .env
 # and fixes the Windows console encoding for every module that imports it.
@@ -89,6 +93,59 @@ app = Flask(__name__)
 #     gunicorn -k gevent serve:app    ← breaks every MCP call you make
 
 _one_at_a_time = threading.Lock()
+_log_lock = threading.Lock()
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _short_output(session):
+    if not session:
+        return None
+    item = session.get("selected_item") or {}
+    return {
+        "selected_item": item.get("title"),
+        "deal_status": (session.get("deal_check") or {}).get("status"),
+        "outfit_suggestion": session.get("outfit_suggestion"),
+        "fit_card": session.get("fit_card"),
+        "error": session.get("error"),
+    }
+
+
+def log_run(
+    *,
+    input_text,
+    status,
+    duration_ms,
+    output=None,
+    error=None,
+    model_calls=0,
+    prompt_tokens=0,
+    output_tokens=0,
+):
+    record = {
+        "timestamp": _utc_timestamp(),
+        "run_id": str(uuid.uuid4()),
+        "input": input_text,
+        "output": output,
+        "status": status,
+        "duration_ms": duration_ms,
+        "model": os.getenv("AI201_MODEL", "gemini-3.5-flash-lite"),
+        "model_calls": model_calls,
+        "prompt_tokens": prompt_tokens,
+        "output_tokens": output_tokens,
+        "error": error,
+    }
+
+    log_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "runs.jsonl")
+    with _log_lock:
+        with open(log_path, "a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    return record
 
 
 @app.get("/health")
@@ -107,12 +164,22 @@ def ask():
                                                 example wardrobe the CLI uses.
     Out:  the session dict from run_agent(), as JSON.
     """
+    started = time.perf_counter()
     payload = request.get_json(silent=True) or {}
     query = (payload.get("query") or "").strip()
     if not query:
         # 400 rather than a stack trace: the caller can act on this one.
-        return jsonify({"error": "Send JSON with a 'query' field, e.g. "
-                                 '{"query": "vintage graphic tee under $30"}'}), 400
+        error = "Send JSON with a 'query' field, e.g. "
+        error += '{"query": "vintage graphic tee under $30"}'
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        log_run(
+            input_text=query,
+            status="error",
+            duration_ms=duration_ms,
+            output=None,
+            error=error,
+        )
+        return jsonify({"error": error}), 400
 
     wardrobe = payload.get("wardrobe")
     if not isinstance(wardrobe, dict):
@@ -138,6 +205,10 @@ def ask():
 
     failure = None
     session = None
+    import generate
+
+    calls_before = generate.call_count()
+    tokens_before = generate.token_counts()
     with _one_at_a_time:
         try:
             session = run_agent(query, wardrobe)
@@ -146,8 +217,34 @@ def ask():
 
     # Outside the lock: building a response is not work the next caller should
     # be waiting on.
+    calls_after = generate.call_count()
+    tokens_after = generate.token_counts()
+    duration_ms = round((time.perf_counter() - started) * 1000)
+
     if failure is not None:
+        log_run(
+            input_text=query,
+            status="error",
+            duration_ms=duration_ms,
+            output=None,
+            error=failure,
+            model_calls=calls_after - calls_before,
+            prompt_tokens=tokens_after["prompt"] - tokens_before["prompt"],
+            output_tokens=tokens_after["output"] - tokens_before["output"],
+        )
         return jsonify({"error": failure}), 500
+
+    session_error = (session or {}).get("error")
+    log_run(
+        input_text=query,
+        status="error" if session_error else "success",
+        duration_ms=duration_ms,
+        output=_short_output(session),
+        error=session_error,
+        model_calls=calls_after - calls_before,
+        prompt_tokens=tokens_after["prompt"] - tokens_before["prompt"],
+        output_tokens=tokens_after["output"] - tokens_before["output"],
+    )
 
     return jsonify(session)
 

@@ -33,7 +33,7 @@ Run these commands from the repository's parent directory.
 **macOS / Linux**
 
 ```bash
-git clone <repository-url> fitfindr
+git clone https://github.com/gerardorivera04/ai201-project2-fitfindr-starter-v2026.git fitfindr
 cd fitfindr
 
 python3 -m venv .venv
@@ -86,6 +86,10 @@ The server is available at:
 ```text
 http://localhost:5000
 ```
+
+Port `5000` is the default. It is also commonly used by macOS AirPlay
+Receiver or another process already running on the machine. If the default
+port is unavailable, use a different port instead of changing project code.
 
 Verify it is running:
 
@@ -197,10 +201,54 @@ pricing page is only an estimate.
 If `test.py` says the key is missing, confirm `.env` exists at the repository
 root and contains `GEMINI_API_KEY`.
 
-If the port is already in use, choose another one:
+**Port 5000 is already in use**
+
+First, determine whether another process is using the port:
+
+**macOS / Linux**
+
+```bash
+lsof -nP -iTCP:5000 -sTCP:LISTEN
+```
+
+**Windows (PowerShell)**
+
+```powershell
+Get-NetTCPConnection -State Listen -LocalPort 5000 |
+  Select-Object LocalAddress, LocalPort, OwningProcess
+```
+
+If the listener is another FitFindr instance started by you, stop that
+process with `Ctrl-C` in its terminal. Do not stop a system process unless
+you recognize it.
+
+On macOS, `ControlCenter` or `ControlCe` commonly owns port 5000 because
+AirPlay Receiver is enabled. You can disable **AirPlay Receiver** in
+**System Settings > General > AirDrop & Handoff** or
+**System Settings > General > Sharing**, depending on your macOS version.
+That restores the default port, but disabling the setting is optional.
+
+The recommended fallback is to use another port. On macOS or Linux:
 
 ```bash
 PORT=5001 python serve.py
+curl http://localhost:5001/health
+curl -X POST http://localhost:5001/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"vintage graphic tee under $30"}'
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:PORT="5001"
+python serve.py
+```
+
+In a second PowerShell terminal:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:5001/health -Method Get
 ```
 
 If `python serve.py` cannot import a package, activate `.venv` and run:
