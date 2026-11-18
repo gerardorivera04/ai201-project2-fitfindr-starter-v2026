@@ -155,7 +155,7 @@ def check_deal(new_item: dict, max_price: float | None) -> dict:
             "status": "unknown",
             "price": price,
             "max_price": max_price,
-            "message": "The listing did not provide a usable price.",
+            "message": "The listing has no usable price.",
         }
 
     price = float(price)

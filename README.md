@@ -739,10 +739,102 @@ outlier.
 
 ## Run Log - Before
 
+<!-- Five criteria, five tries each, in this exact format.
+
+     Five, because your criteria are written out of five. Mark each try PASS
+     or FAIL, count the passes, and read that count against your target — a
+     row targeting 4 of 5 with three PASS cells is MISSED (3/5).
+
+     `python run_eval.py --label before` runs everything and writes the table
+     into results/. Paste it here and fill in the verdicts. -->
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. The deal check reports an in-budget listing | 5/5 | 3/5; 2 not run | 3/5; 2 not run | 3/5; 2 not run | MISSED — target not reached |
+| 2. The deal check identifies a near-limit price | 5/5 | 3/5; 2 not run | 3/5; 2 not run | 3/5; 2 not run | MISSED — target not reached |
+| 3. An over-budget item stops before outfit suggestion | 5/5 | 3/5; 2 not run | 3/5; 2 not run | 3/5; 2 not run | MISSED — target not reached |
+| 4. A listing with no usable price stops safely | 10/10 loop tries | 6/10; 4 not run | 6/10; 4 not run | 6/10; 4 not run | MISSED — target not reached |
+| 5. The deal result remains attached to the selected item | 5/5 | 3/5; 2 not run | 3/5; 2 not run | 3/5; 2 not run | MISSED — target not reached |
+
+**Real output from one try**, pasted as text, naming the file and function
+that produced it:
+
+The excerpts below are copied from
+[`results/run_2026-11-17_2221_before.md`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/results/run_2026-11-17_2221_before.md).
+
+**Criterion 1 — `check_deal()` in [`tools.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py)**
+
+```text
+**Try 1**
+
+- status: `within`
+- price: `24.0`
+- message: This item costs $24.00, within your $30.00 maximum budget.
+```
+
+**Criterion 2 — `check_deal()` in [`tools.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py)**
+
+```text
+**Try 1**
+
+- status: `near_limit`
+- price: `27.0`
+- message: This item costs $27.00, close to your $30.00 maximum budget.
+```
+
+**Criterion 3 — `run_agent()` in [`agent.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/agent.py), Try 1**
+
+```text
+- stopped early: yes — This item costs $42.00, which is over your $30.00 maximum budget.
+- selected_item: Denim Jacket ($42.0, synthetic)
+- search_results: 1
+- deal_check: over_budget
+- deal_check message: This item costs $42.00, which is over your $30.00 maximum budget.
+- suggest_outfit calls: 0
+```
+
+**Criterion 4 — `check_deal()` and `run_agent()` in [`tools.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py) and [`agent.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/agent.py), Try 1**
+
+```text
+Missing price:
+- status: `unknown`
+- price: `None`
+- message: The listing has no usable price.
+- stopped early: yes — I cannot verify this listing's budget status because it has no usable price.
+- suggest_outfit calls: 0
+
+Nonnumeric price:
+- status: `unknown`
+- price: `unknown`
+- message: The listing has no usable price.
+- stopped early: yes — I cannot verify this listing's budget status because it has no usable price.
+- suggest_outfit calls: 0
+```
+
+**Criterion 5 — `run_agent()` and `check_deal()` in [`agent.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/agent.py) and [`tools.py`](/Users/gerardorivera/ai201-project2-fitfindr-starter-v2026/tools.py), Try 1**
+
+```text
+- stopped early: no
+- selected_item: Graphic Tee — 2003 Tour Bootleg Style ($24.0, depop)
+- search_results: 10
+- deal_check: within
+- deal_check message: This item costs $24.00, within your $30.00 maximum budget.
+- suggest_outfit calls: 1
+```
 
 ---
 
 ## Verdicts and Diagnoses
+
+| Criterion | Verdict | Reason |
+|---|---|---|
+| 1. In-budget listing | MISSED | The implementation produced the correct `within` result in all 3 executed tries, but only 3 of the required 5 tries were run. |
+| 2. Near-limit listing | MISSED | The implementation produced the exact `near_limit` result in all 3 executed tries, but only 3 of the required 5 tries were run. |
+| 3. Over-budget stop | MISSED | All 3 executed loop runs stopped before `suggest_outfit`, but the criterion requires 5 loop runs. |
+| 4. Unusable price | MISSED | Missing and nonnumeric prices both passed in all 6 executed loop tries, but the criterion requires 10 loop tries: 5 for each bad-price form. |
+| 5. Selected-item state | MISSED | The selected-item title and price remained attached to `deal_check` in all 3 executed runs, but the criterion requires 5 runs. |
+
+These are target-completion misses, not evidence of five implementation failures. Criteria 1–4 are deterministic local checks, and all executed failures were handled correctly. Criterion 5 is also deterministic with respect to the selected listing and `deal_check`; the log confirms caching was off and the temperature was `0.9`, while the generated outfit/fit-card text varied. Re-running with 5 tries in each of 3 trials is required before any criterion can be evaluated as `MET`.
 
 
 
