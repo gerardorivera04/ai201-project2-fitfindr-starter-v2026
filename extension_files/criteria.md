@@ -14,119 +14,83 @@ data earns credit; *"80% seemed reasonable"* does not.
 
 ---
 
-## 1. A matching query completes all three tools
+## 1. The deal check reports an in-budget listing
 
-Given a query that matches at least one listing, the agent completes all three
-tool calls and returns a fit card — in at least 4 of 5 tries.
+Calling `check_deal({"title": "Denim Jacket", "price": 24.0}, 30.0)` returns
+exactly `status: "within"` and the message
+`"This item costs $24.00, within your $30.00 maximum budget."` — in 5 of 5
+tries.
 
-**Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
-
-I picked 4 of 5 because the system is going to miss some valuable information with the clothing listings as it completes the process of returning a fit card. For instance, FitFindr possesses a search tool containing plain keyword match functionality, and some phrasings will be missed in the clothing listings that would affect the final details of the fit card.
-
----
-
-## 2. An impossible query stops before the second tool
-
-Given a query that matches no listings, the agent stops before calling
-`suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
-
-**Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
-
-I picked 5 of 5 because the system is listing a user requirement that must be met before any outfits can be suggested. Thus, no clothing listings means no suggested outfits due to the FitFindr system not having anything to work with to make any progress. 
+**Why this target:** A 30-dollar budget is an exact, well-known example in the
+existing FitFindr data. This target is stricter than a sample response only
+with a human-readable amount because the status must feed the planning-loop
+branch, while 5 of 5 is appropriate because a local price comparison has no
+model variability.
 
 ---
 
-## 3. Something about state
+## 2. The deal check identifies a near-limit price
 
-Given a suggested outfit, a comparison is conducted to ensure the searched items' information goes unchanged for the suggestions of one or two outfits to the user - in at least 3 of 5 tries.  
+Calling `check_deal({"title": "Denim Jacket", "price": 27.0}, 30.0)` returns
+exactly `status: "near_limit"` and the message
+`"This item costs $27.00, close to your $30.00 maximum budget."` — in 5 of 5
+tries.
 
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
-
-**Why this target:**
-
-I picked 3 of 5 because the suggested outfit functionality will miss out on key information of the clothing items that would some major confusion. For instance, the suggested outfit must have a clothing item in red for the suggested outfit, but is it a dark red or a lighter red color. 
+**Why this target:** The 90% threshold is 27 dollars on a 30-dollar budget, so
+this example is a direct boundary test. 5 of 5 is not looser than necessary
+because a three-dollar gap is small enough that misclassifying the deal as
+ordinary “within” would hide useful warning context. The threshold is not
+stricter than 90% because 27 dollars is already explicitly near 30 dollars
+and a fully exact 100% cap would miss the intended warning.
 
 ---
 
-## 4. Something about the fit card
+## 3. An over-budget item stops before outfit suggestion
 
-After the fit card is produced, all the details in the fit card are descriptive enough to where the card is shorter than a caption anyone would post - 5 of 5 tries. 
+Run `run_agent("denim jacket under $30", wardrobe)` five times, and make the
+search result used by the loop cost $42.00. For each run, the loop sets
+`deal_check.status` to `over_budget`, puts the budget error in `session["error"]`,
+and never calls `suggest_outfit` — in 5 of 5 tries.
 
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
-
-**Why this target:**
-
-I picked 5 of 5 because the fit card is intended to list all the clothing items and the information surrounding the ideal outfit, while the caption is meant to be very descriptive about what makes the outfit so special, such as details on its meaning and vibe.  
+**Why this target:** Recommending an outfit for an item outside the user's
+stated ceiling would spend effort on a purchase the user cannot afford. 5 of 5
+is required because this is a deterministic bad path, while testing 42 dollars
+against 30 dollars avoids an ambiguous boundary close to the 90% threshold.
 
 ---
 
-## 5. Your choice
+## 4. A listing with no usable price stops safely
 
-Given a query that matches at least one listing, the search query respects a price ceiling to match the prices of the clothing listings - in at least 4 of 5 tries. 
+Run `check_deal({"title": "Denim Jacket"}, 30.0)` and
+`check_deal({"title": "Denim Jacket", "price": "unknown"}, 30.0)` separately.
+Each call returns `status: "unknown"` and a message containing “no usable
+price.” Then run the loop with each listing selected: `session["error"]`
+contains “no usable price,” and `suggest_outfit` is not called. Pass both bad
+price forms on 5 separate loop tries each — 10 loop tries total.
 
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
-
-**Why this target:**
-
-I picked 4 of 5 because my search contains price-matching functionality, and some price ceilings would need to be adjusted to find the correct clothing listing in a specific price range.
+**Why this target:** Thrift listings can omit or corrupt price fields, and
+recommending the item as affordable would make an unsupported claim. 5 of 5
+is stricter than treating this as a model-quality issue because price validity
+is a local, deterministic check. Missing and nonnumeric prices are both
+included so the test catches the same failure in the two forms the data can
+contain.
 
 ---
 
-<!-- ─────────────────────────────────────────────────────────────────────────
-     UNIT 4 — read this before you change anything above.
+## 5. The deal result remains attached to the selected item
 
-     If a criterion turns out to be BROKEN rather than merely unmet, you can
-     revise it, and that earns credit. But never delete or edit the original
-     line. Add the revision underneath it, like this:
+Run `run_agent("vintage graphic tee under $30", example wardrobe)` five times.
+For each run, record the first item returned by `search_listings`, the
+`selected_item` stored in the session, and `deal_check`. Compare the three
+numeric and text fields as follows: `selected_item.title` equals the first
+search result's title, `selected_item.price` equals that result's price,
+`deal_check.price` equals `selected_item.price`, and the item price formatted
+as `"$24.00"` (or the actual selected price formatted with two decimals)
+appears in `deal_check.message` — in 5 of 5 tries.
 
-         ## 4. Something about the fit card
-
-         The fit card is different every time.
-
-         **Why this target:** ...
-
-         > **Revised in unit 4:** For 5 different items, the 5 fit cards share
-         > no opening sentence.
-         >
-         > **Why revised:** "different" wasn't checkable — two cards that
-         > differed by one word still counted. The new version is something I
-         > can actually score.
-
-     That's a revision because the criterion couldn't be MEASURED.
-
-     Lowering a target because you missed it is not a revision, and it costs
-     you the point:
-
-         ✗ "I said the empty search stops it 5 of 5 times, but I got 3 of 5,
-            so 3 of 5 is more realistic."
-
-     A number you missed stays where it is, gets diagnosed, and gets a fix
-     attempted. That's where the points are.
-     ───────────────────────────────────────────────────────────────────────── -->
+**Why this target:** This state check protects against a deal result being
+computed for one listing after search has selected another. 5 of 5 is required
+because state propagation in this local loop is deterministic: the first
+search result is stored, then passed directly to `check_deal`. A 4 of 5 target
+would permit the listing/price mismatch this extension is meant to prevent,
+and no search-model variability justifies that miss.
