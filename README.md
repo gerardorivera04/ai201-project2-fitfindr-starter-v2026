@@ -429,7 +429,7 @@ the loop, so one search does not issue duplicate tool calls.
 <!-- What you changed, why your diagnosis pointed at it, and the after-run in
      the same table format. One change, measured properly.
 
-     `python run_eval.py --label after` -->
+     `python capstone_files/run_eval2.py --label after --tries 5 --trials 3` -->
 
 **What I changed:**
 
@@ -483,6 +483,12 @@ item, a non-empty outfit suggestion, and a fit card rather than stopping early.
 ---
 
 ## What's Still Broken
+
+Nothing observed in the complete after-run. The evaluator now prevents
+under-sized evidence, and all five acceptance criteria passed in each of the
+three trials. The guard verifies test coverage; it does not replace checking
+the recorded statuses and loop behavior, which were also correct in these
+reports.
 
 <!-- For each criterion still missed: what you'd do, and why you stopped where
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
@@ -836,21 +842,145 @@ Nonnumeric price:
 
 These are target-completion misses, not evidence of five implementation failures. Criteria 1–4 are deterministic local checks, and all executed failures were handled correctly. Criterion 5 is also deterministic with respect to the selected listing and `deal_check`; the log confirms caching was off and the temperature was `0.9`, while the generated outfit/fit-card text varied. Re-running with 5 tries in each of 3 trials is required before any criterion can be evaluated as `MET`.
 
+Diagnosis for Criteria #1: The miss was produced in the evaluation stage, not by
+`check_deal()`. The evaluator ran only 3 of the required 5 in-budget cases in
+each trial, so 2 cases were never executed and the report could not establish
+the required 5/5 result, even though all 3 observed cases returned
+`status="within"`. The mechanism was incomplete test coverage: the run-count
+threshold failed before the deterministic deal-check behavior could be judged
+against the criterion.
 
+Diagnosis for Criteria #2: The miss was produced in the evaluation stage, not
+by the near-limit branch in `check_deal()`. Only 3 of the required 5
+near-limit cases ran in each trial, leaving 2 cases untested; every executed
+case returned `status="near_limit"` with the expected message. The mechanism
+was the evaluator stopping before it reached the criterion's required sample
+count, so this is a target-completion failure rather than evidence that the
+price comparison or boundary classification is wrong.
+
+Diagnosis for Criteria #3: The miss was produced by the evaluation stage
+before the full criterion sample was collected. `run_agent()` correctly stored
+the `over_budget` deal result and took its early-return branch before
+`suggest_outfit` in all 3 executed cases, but 2 of the required 5 loop runs
+were not run. The mechanism was insufficient repeated execution, not a
+failure of the over-budget branch or an unintended outfit-tool call.
+
+Diagnosis for Criteria #4: The miss was produced in the evaluation stage's
+bad-price test matrix. The missing-price and nonnumeric-price paths both
+reached `check_deal()`, returned `status="unknown"`, and stopped
+`run_agent()` before `suggest_outfit` for all 6 executed cases, but 4 of the
+required 10 loop tries were never run. The mechanism was incomplete coverage
+of the two malformed-price inputs, so the report could not prove the required
+10/10 safety target even though no executed case leaked through to outfit
+generation.
+
+Diagnosis for Criteria #5: The miss was produced by the evaluation stage's
+run-count limit, not by session state or `check_deal()`. In all 3 executed
+runs, `run_agent()` kept the selected listing attached to the deal result and
+passed the correct title and price onward, but 2 of the required 5 runs were
+not executed. The mechanism was an under-sized sample, compounded by
+variable generated outfit and fit-card text, which prevented the report from
+claiming the required 5/5 state-preservation result.
+
+
+**Common Pattern among the Diagnoses**
+
+All five misses trace to the same stage: the evaluation stage, specifically
+incomplete test execution. The evaluator ran only 3 of 5 required cases for
+criteria 1, 2, 3, and 5, and only 6 of the required 10 cases for criterion 4.
+That single run-count and coverage problem produced five symptoms: the report
+could not prove the in-budget result, near-limit classification, over-budget
+stop, unusable-price safety, or selected-item state preservation against their
+full targets. The deal-check tool and the loop behaved correctly in every
+executed case, so these are target-completion misses rather than five separate
+implementation defects. Because the after-run is still blank, I cannot claim
+that all five criteria were met; the immediate correction is to run the
+complete required test matrix before judging the extension.
 
 ---
 
 ## Run Log - After
 
----
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. In-budget listing | 5/5 | 5/5 PASS | 5/5 PASS | 5/5 PASS | MET |
+| 2. Near-limit price | 5/5 | 5/5 PASS | 5/5 PASS | 5/5 PASS | MET |
+| 3. Over-budget stop | 5/5 | 5/5 PASS | 5/5 PASS | 5/5 PASS | MET |
+| 4. Unusable price | 10/10 loop tries | 10/10 PASS | 10/10 PASS | 10/10 PASS | MET |
+| 5. Selected-item state | 5/5 | 5/5 PASS | 5/5 PASS | 5/5 PASS | MET |
 
-## Loop Trace
+Each run used five tries per scenario with caching disabled. Criteria 1 and 2
+returned the exact expected statuses in all five direct-tool tries. Criterion
+3 stopped before `suggest_outfit` in all five loop tries. Criterion 4 covered
+five missing-price and five nonnumeric-price loop tries per run; every case
+returned `unknown` and stopped before `suggest_outfit`. Criterion 5 preserved
+the selected graphic tee and its `$24.00` price through `deal_check` in all
+five tries. The single consolidated report is
+`results/run_2026-11-18_0020_after.md`; it contains all three trials.
+
+**Did it help, and how do I know:**
+
+Yes. The improvement fixed the evaluation-stage coverage problem without
+changing the deal-check logic. The Before report ran only 3 tries for
+criteria 1, 2, 3, and 5, and 6 of the required 10 loop tries for criterion 4,
+so those criteria were marked MISSED even though every executed case passed.
+The consolidated After report ran 3 trials with 5 tries per scenario: each
+trial produced 5/5 PASS for criteria 1, 2, 3, and 5, and 10/10 PASS for
+criterion 4. The statuses were `within`, `near_limit`, `over_budget`, and
+`unknown` as expected, and the stop-path scenarios made zero
+`suggest_outfit` calls.
+
+```bash
+python3 capstone_files/run_eval2.py --label after --tries 5 --trials 3
+```
+
+This command produced the single evidence file
+`results/run_2026-11-18_0020_after.md`, which records all 3 trials and all 5
+tries per scenario.
+
+<!-- If it made things worse, say that. Honestly reported, that earns full
+     credit and is more interesting than one that worked. -->
 
 ---
 
 ## The Improvement
 
+<!-- What you changed, why your diagnosis pointed at it, and the after-run in
+     the same table format. One change, measured properly.
+
+     `python run_eval.py --label after` -->
+
+**What I changed:** I changed
+`capstone_files/run_eval2.py::main` so the deal-check evaluator defaults to
+five tries per scenario instead of three, and rejects any `--tries` value
+below five. This makes the evaluator execute the complete acceptance matrix:
+five tries for criteria 1–3 and 5, plus five missing-price and five
+nonnumeric-price loop tries for criterion 4.
+
+**Which failure it was meant to fix:** This directly fixes the common
+evaluation-stage failure identified in the diagnoses: the old evaluator
+under-ran the matrix, producing 3/5 and 6/10 reports even when every executed
+case passed. The new minimum-run guard prevents another under-sized run from
+being reported as evidence for these criteria.
+
+**Did it help, and how do I know:** Yes. After the change, all three complete
+trials met every target: criteria 1, 2, 3, and 5 passed 5/5, and criterion 4
+passed 10/10. The evaluator also rejected a deliberate `--tries 3` command
+with `--tries must be at least 5`, proving that the original coverage failure
+cannot recur through the normal command.
+
+
 
 ---
 
 ## What's Still Broken
+
+<!-- For each criterion still missed: what you'd do, and why you stopped where
+     you did. "I ran out of time" is fine if it's true. Pretending nothing is
+     left is not. -->
+
+Nothing observed in the complete after-run. The evaluator now prevents
+under-sized evidence, and all five acceptance criteria passed in each of the
+three trials. The guard verifies test coverage; it does not replace checking
+the recorded statuses and loop behavior, which were also correct in these
+reports.

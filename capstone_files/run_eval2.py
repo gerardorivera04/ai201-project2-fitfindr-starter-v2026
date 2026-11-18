@@ -5,7 +5,7 @@ Run the deal-check acceptance scenarios three times and write a before/after log
 Examples:
     python capstone_files/run_eval2.py
     python capstone_files/run_eval2.py --label before
-    python capstone_files/run_eval2.py --label after --tries 3
+    python capstone_files/run_eval2.py --label after --tries 5 --trials 3
 """
 
 import argparse
@@ -25,6 +25,8 @@ from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
 
 sys.path.insert(0, str(ROOT / "capstone_files"))
 import scenarios as scenario_module
+
+MIN_TRIES = 5
 
 
 def run_once(scenario, use_trace=True):
@@ -89,14 +91,25 @@ def main():
         description="Run deal-check scenarios and write a run log."
     )
     parser.add_argument(
-        "--tries", "--trials", type=int, default=3, dest="tries",
-        help="tries per scenario (default 3)",
+        "--tries", type=int, default=MIN_TRIES, dest="tries",
+        help=f"tries per scenario (default {MIN_TRIES})",
     )
     parser.add_argument(
         "--label", default="before",
         help="run label, e.g. before or after",
     )
+    parser.add_argument(
+        "--trials", type=int, default=3,
+        help="complete trials to include in one report (default 3)",
+    )
     args = parser.parse_args()
+
+    if args.tries < MIN_TRIES:
+        parser.error(
+            f"--tries must be at least {MIN_TRIES} to cover the acceptance criteria"
+        )
+    if args.trials < 1:
+        parser.error("--trials must be at least 1")
 
     problems = scenario_module.validate()
     if problems:
@@ -112,49 +125,55 @@ def main():
     config.CACHE_ENABLED = False
     print("Cache is OFF for this run — that's deliberate.\n")
 
-    rows = []
-    for scenario in scenario_module.SCENARIOS:
-        print(f"{scenario['name']}  ({scenario['criterion']})")
+    trials = []
+    for trial in range(1, args.trials + 1):
+        print(f"Trial {trial}/{args.trials}")
+        rows = []
+        for scenario in scenario_module.SCENARIOS:
+            print(f"{scenario['name']}  ({scenario['criterion']})")
 
-        tries = []
-        for attempt in range(1, args.tries + 1):
-            record = run_once(scenario)
-            tries.append(record)
+            tries = []
+            for attempt in range(1, args.tries + 1):
+                record = run_once(scenario)
+                tries.append(record)
 
-            if record["crashed"]:
-                print(f"  try {attempt}: CRASHED — {record['crashed']}")
-            elif scenario["kind"] == "tool":
-                print(
-                    f"  try {attempt}: "
-                    f"{record['direct_result'].get('status', '(no status)')}"
-                )
-            else:
-                session = record["session"] or {}
-                if session.get("error"):
+                if record["crashed"]:
+                    print(f"  try {attempt}: CRASHED — {record['crashed']}")
+                elif scenario["kind"] == "tool":
                     print(
-                        f"  try {attempt}: stopped early — "
-                        f"{str(session['error'])[:60]}"
+                        f"  try {attempt}: "
+                        f"{record['direct_result'].get('status', '(no status)')}"
                     )
                 else:
-                    print(
-                        f"  try {attempt}: completed — "
-                        f"{len(str(session.get('fit_card') or ''))} fit-card chars"
-                    )
-        rows.append({"scenario": scenario, "tries": tries})
-        print()
+                    session = record["session"] or {}
+                    if session.get("error"):
+                        print(
+                            f"  try {attempt}: stopped early — "
+                            f"{str(session['error'])[:60]}"
+                        )
+                    else:
+                        print(
+                            f"  try {attempt}: completed — "
+                            f"{len(str(session.get('fit_card') or ''))} fit-card chars"
+                        )
+            rows.append({"scenario": scenario, "tries": tries})
+            print()
+        trials.append({"number": trial, "rows": rows})
 
-    write_report(rows, args)
+    write_report(trials, args)
 
 
-def write_report(rows, args):
+def write_report(trials, args):
     config.RESULTS_DIR.mkdir(exist_ok=True)
     stamp = dt.datetime.now().strftime("%Y-%m-%d_%H%M")
     label = f"_{args.label}" if args.label else ""
     path = config.RESULTS_DIR / f"run_{stamp}{label}.md"
 
     n = args.tries
-    headers = " | ".join(f"Try {i}" for i in range(1, n + 1))
-    divider = "|".join(["---"] * n)
+    trial_headers = " | ".join(
+        f"Trial {trial['number']}" for trial in trials
+    )
+    trial_divider = "|".join(["---"] * len(trials))
 
     lines = [
         f"# Deal Check Run Log{f' — {args.label}' if args.label else ''}",
@@ -162,29 +181,33 @@ def write_report(rows, args):
         "- Produced by: `capstone_files/run_eval2.py::main`",
         "- Scenarios: `capstone_files/scenarios.py`",
         "- Loop: `agent.py::run_agent` · tools: `tools.py`",
-        f"- Tries per scenario: {n}, caching off",
+        f"- Trials: {len(trials)} · tries per scenario: {n}, caching off",
         f"- Temperature: {config.TEMPERATURE}",
         f"- When: {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
         "Paste the table below into your README. Fill in each criterion's",
-        "target from `capstone_files/criteria.md`, mark each try PASS or FAIL",
+        "target from `capstone_files/criteria.md`, mark each trial PASS or FAIL",
         "from the output underneath, and count the passes for the Verdict.",
         "",
-        f"| Criterion | Target | {headers} | Verdict |",
-        f"|---|---|{divider}|---|",
+        f"| Criterion | Target | {trial_headers} | Verdict |",
+        f"|---|---|{trial_divider}|---|",
     ]
 
-    for row in rows:
+    for row_index, row in enumerate(trials[0]["rows"]):
         scenario = row["scenario"]
         number = scenario["criterion"]
+        cells = " | ".join(
+            f"{len(trial['rows'][row_index]['tries'])} tries recorded"
+            for trial in trials
+        )
         lines.append(
-            f"| {number}. {scenario['name']} |  "
-            f"| {' | '.join([' '] * n)} |  |"
+            f"| {number}. {scenario['name']} |  | {cells} |  |"
         )
 
     lines += [
         "",
-        "> Mark PASS only when the try matches the stated acceptance criterion.",
+        "> Mark PASS only when every required try in that trial matches the",
+        "> stated acceptance criterion.",
         "",
         "---",
         "",
@@ -192,90 +215,91 @@ def write_report(rows, args):
         "",
     ]
 
-    for row in rows:
-        scenario = row["scenario"]
-        lines += [
-            f"### {scenario['name']}",
-            "",
-            f"- Criterion: {scenario['criterion']}",
-        ]
-
-        if scenario["kind"] == "tool":
+    for trial in trials:
+        for row in trial["rows"]:
+            scenario = row["scenario"]
             lines += [
-                f"- Item: `{scenario['item']}`",
-                f"- Maximum price: `${scenario['max_price']:.2f}`",
+                f"### Trial {trial['number']} — {scenario['name']}",
                 "",
+                f"- Criterion: {scenario['criterion']}",
             ]
-        else:
-            lines += [
-                f"- Query: `{scenario['query']}`",
-                f"- Wardrobe: {scenario['wardrobe']}",
-                "",
-            ]
-
-        for i, record in enumerate(row["tries"], 1):
-            lines += [f"**Try {i}**", ""]
-
-            if record["crashed"]:
-                lines += [
-                    "Crashed:",
-                    "",
-                    "```",
-                    record["crashed"],
-                    "```",
-                    "",
-                ]
-                continue
 
             if scenario["kind"] == "tool":
-                result = record["direct_result"] or {}
                 lines += [
-                    f"- status: `{result.get('status', '(missing)')}`",
-                    f"- price: `{result.get('price')}`",
-                    f"- message: {result.get('message', '(missing)')}",
+                    f"- Item: `{scenario['item']}`",
+                    f"- Maximum price: `${scenario['max_price']:.2f}`",
                     "",
                 ]
-                continue
+            else:
+                lines += [
+                    f"- Query: `{scenario['query']}`",
+                    f"- Wardrobe: {scenario['wardrobe']}",
+                    "",
+                ]
 
-            session = record["session"] or {}
-            item = session.get("selected_item") or {}
-            deal_check = session.get("deal_check") or {}
-            search_results = session.get("search_results") or []
-            lines += [
-                f"- stopped early: "
-                f"{'yes — ' + str(session.get('error')) if session.get('error') else 'no'}",
-                f"- selected_item: {item.get('title', '(none)')}"
-                + (
-                    f" (${item.get('price')}, {item.get('platform', 'synthetic')})"
-                    if item
-                    else ""
-                ),
-                f"- search_results: {len(search_results)}",
-                f"- deal_check: {deal_check.get('status', '(not run)')}",
-                f"- deal_check message: {deal_check.get('message', '(none)')}",
-                f"- suggest_outfit calls: {record['suggest_outfit_calls']}",
-                "",
-            ]
-            if session.get("outfit_suggestion"):
+            for i, record in enumerate(row["tries"], 1):
+                lines += [f"**Try {i}**", ""]
+
+                if record["crashed"]:
+                    lines += [
+                        "Crashed:",
+                        "",
+                        "```",
+                        record["crashed"],
+                        "```",
+                        "",
+                    ]
+                    continue
+
+                if scenario["kind"] == "tool":
+                    result = record["direct_result"] or {}
+                    lines += [
+                        f"- status: `{result.get('status', '(missing)')}`",
+                        f"- price: `{result.get('price')}`",
+                        f"- message: {result.get('message', '(missing)')}",
+                        "",
+                    ]
+                    continue
+
+                session = record["session"] or {}
+                item = session.get("selected_item") or {}
+                deal_check = session.get("deal_check") or {}
+                search_results = session.get("search_results") or []
                 lines += [
-                    "Outfit suggestion:",
-                    "",
-                    "```",
-                    str(session["outfit_suggestion"]),
-                    "```",
+                    f"- stopped early: "
+                    f"{'yes — ' + str(session.get('error')) if session.get('error') else 'no'}",
+                    f"- selected_item: {item.get('title', '(none)')}"
+                    + (
+                        f" (${item.get('price')}, {item.get('platform', 'synthetic')})"
+                        if item
+                        else ""
+                    ),
+                    f"- search_results: {len(search_results)}",
+                    f"- deal_check: {deal_check.get('status', '(not run)')}",
+                    f"- deal_check message: {deal_check.get('message', '(none)')}",
+                    f"- suggest_outfit calls: {record['suggest_outfit_calls']}",
                     "",
                 ]
-            if session.get("fit_card"):
-                lines += [
-                    "Fit card:",
-                    "",
-                    "```",
-                    str(session["fit_card"]),
-                    "```",
-                    "",
-                ]
-            if record["trace"]:
-                lines += ["Trace:", "", "```", record["trace"], "```", ""]
+                if session.get("outfit_suggestion"):
+                    lines += [
+                        "Outfit suggestion:",
+                        "",
+                        "```",
+                        str(session["outfit_suggestion"]),
+                        "```",
+                        "",
+                    ]
+                if session.get("fit_card"):
+                    lines += [
+                        "Fit card:",
+                        "",
+                        "```",
+                        str(session["fit_card"]),
+                        "```",
+                        "",
+                    ]
+                if record["trace"]:
+                    lines += ["Trace:", "", "```", record["trace"], "```", ""]
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
