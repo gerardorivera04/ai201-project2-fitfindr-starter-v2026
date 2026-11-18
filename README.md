@@ -535,10 +535,16 @@ verifying if the outfit suggestions still produce a non-empty fallback suggestio
 
 <!-- ═══════════════════════ UNIT 9 — CAPSTONE ═══════════════════════ -->
 
-## What This Does
+## What This Extends
 
 System: FitFindr clothing-search and outfit-recommendation agent
 
+FitFindr is a clothing-search and outfit-recommendation agent that parses a
+user's request, finds a matching listing, and generates outfit suggestions and
+a fit card. The new deal-check feature extends that workflow by comparing the
+selected item's price with the user's maximum budget, labeling it as within
+budget, near the limit, or over budget, and stopping safely before outfit
+generation when the price is unusable or over budget.
 
 <!-- ═══════════════════════ BUILDING PHASE ═══════════════════════
 
@@ -710,6 +716,21 @@ between cumulative model-call and token counters before and after
 included a service/rate-limit wait and is retained rather than removed as an
 outlier.
 
+**Cost calculation:** Using the standard Gemini 3.5 Flash-Lite text rates of
+$0.30 per million prompt tokens and $2.50 per million output tokens, the
+measured average costs:
+
+```text
+(1,623.5 / 1,000,000 × $0.30) + (428.3 / 1,000,000 × $2.50)
+= $0.00048705 + $0.00107075
+= $0.00155780 ≈ $0.00156 per run
+```
+
+For 100 people making one run each day: `100 × $0.00156 = $0.156`, or about
+**$0.16 per day** (roughly **$4.67 per 30-day month**), before taxes and any
+hosting costs. This estimate uses uncached standard token pricing; the
+cache-disabled measurement makes the token count reproducible.
+
 
 ---
 
@@ -724,15 +745,30 @@ outlier.
 
 **Moment 1**
 
-- *What I asked for:* 
-- *What came back:* 
-- *What I changed:* 
+- *What I asked for:* I asked the AI assistant to review the deal-check
+  extension and identify the failure paths that should stop the agent before
+  outfit generation.
+- *What came back:* It pointed out that an over-budget item and a listing with
+  a missing or nonnumeric price needed explicit statuses and an early return,
+  while an in-budget item should keep the selected listing in session state
+  and continue through the existing tools.
+- *What I changed:* I implemented the `over_budget`, `near_limit`, `within`,
+  and `unknown` results in `tools.py::check_deal`, then added the branch in
+  `agent.py::run_agent` so that only safe deal results reach `suggest_outfit` and
+  `create_fit_card`.
 
 **Moment 2**
 
-- *What I asked for:* 
-- *What came back:* 
-- *What I changed:* 
+- *What I asked for:* I asked the AI assistant to diagnose why the first
+  deal-check evaluation marked every criterion as missed even though the
+  executed cases passed.
+- *What came back:* It identified an evaluation-coverage problem: the runner
+  executed only three of the five required tries, and only six of the ten
+  required malformed-price loop cases.
+- *What I changed:* I changed
+  `capstone_files/run_eval2.py::main` to require at least five tries per
+  scenario, ran three complete trials with caching disabled, and pasted the
+  resulting 5/5 and 10/10 evidence into the README.
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
 
@@ -969,8 +1005,6 @@ passed 10/10. The evaluator also rejected a deliberate `--tries 3` command
 with `--tries must be at least 5`, proving that the original coverage failure
 cannot recur through the normal command.
 
-
-
 ---
 
 ## What's Still Broken
@@ -979,8 +1013,21 @@ cannot recur through the normal command.
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
 
-Nothing observed in the complete after-run. The evaluator now prevents
-under-sized evidence, and all five acceptance criteria passed in each of the
-three trials. The guard verifies test coverage; it does not replace checking
-the recorded statuses and loop behavior, which were also correct in these
-reports.
+No acceptance criterion is still missed: the complete after-run passed all five
+targets in all three trials. The target I would tighten is **Criterion 5,
+selected-item state**, because 5/5 repeated runs is enough to show the current
+path preserves the title and price, but it does not exercise enough different
+listing shapes to expose an accidental hard-coded value or a mismatch on a
+different selected item.
+
+I would raise that target from **5/5 to 10/10**, using at least five different
+selected listings and asserting that the exact selected title and price reach
+`deal_check` every time. I stopped at 5/5 because that was the acceptance
+target for this milestone and the three complete after-run trials already
+passed it; the remaining work is stronger coverage, not a demonstrated
+failure.
+
+**The trade I'd make if this ran for real:** I would first expand the
+state-preservation evaluation to 10 runs across at least five different
+selected listings. I would do this before adding features because a wrong title or
+price would cause a polished recommendation misleading if I'm not careful.
